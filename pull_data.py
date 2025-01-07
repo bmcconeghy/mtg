@@ -8,7 +8,7 @@ from enum import StrEnum
 import pandas as pd
 import typer
 
-logger = logging.get_logger()
+logger = logging.getLogger()
 
 # Change this to your local path of choice
 BASE_DIR = ""
