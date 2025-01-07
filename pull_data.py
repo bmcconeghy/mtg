@@ -104,7 +104,7 @@ def download_default_cards(
 
 
 def generate_dataframe_from_db(db_path: str) -> pd.DataFrame:
-    with open(db_path) as f:
+    with open(db_path, "rb") as f:
         bulk_data = json.load(f)
 
     card_records = [flatten_dict(card) for card in bulk_data]
