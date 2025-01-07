@@ -89,11 +89,15 @@ def download_default_cards(
     # Incorrectly typed here because Typer doesn't support `| None`
     local_path: str = None,
     bulk_data_type: BulkDataType = BulkDataType.default_cards,
+    check_cache: bool = True,
 ) -> str:
     if not local_path:
         cwd = os.getcwd()
-        datetime_stamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M")
+        datetime_stamp = datetime.datetime.now().strftime("%Y-%m-%d")
         local_path = f"{cwd}/{datetime_stamp}_scryfall.json"
+    if check_cache:
+        if os.path.exists(local_path):
+            return local_path
     all_dbs = get_database_uris()
     for db in all_dbs["data"]:
         if db["type"] == bulk_data_type:
@@ -121,6 +125,7 @@ def convert_json_db_to_csv(
         default=None, help="Path to the Scryfall DB on your local machine"
     ),
 ):
+    assert not os.path.exists(output_path), f"{output_path=} already exists! Either delete it, or specify a different file path."
     if not json_db_path:
         db_path = download_default_cards()
     df = generate_dataframe_from_db(db_path)
