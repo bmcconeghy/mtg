@@ -1,15 +1,14 @@
 import datetime
 import json
+import logging
 import os
 import requests
 from enum import StrEnum
 
 import pandas as pd
-import structlog
 import typer
-from rich.pretty import pprint
 
-logger = structlog.get_logger()
+logger = logging.get_logger()
 
 # Change this to your local path of choice
 BASE_DIR = ""
