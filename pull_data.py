@@ -8,7 +8,18 @@ from enum import StrEnum
 import pandas as pd
 import typer
 
-logger = logging.getLogger()
+logging.basicConfig(encoding='utf-8', level=logging.INFO)
+console_handler = logging.StreamHandler()
+formatter = logging.Formatter(
+    "{asctime} - {message}",
+     style="{",
+     datefmt="%Y-%m-%d %H:%M",
+)
+console_handler.setFormatter(formatter)
+logger = logging.getLogger(__name__)
+logger.addHandler(console_handler)
+logger.propagate = False
+
 
 # Change this to your local path of choice
 BASE_DIR = ""
@@ -43,7 +54,7 @@ def download_file(url: str, destination: str):
                 for chunk in response.iter_content(chunk_size=8192):
                     if chunk:
                         file.write(chunk)
-            logger.info("Download completed", destination=destination)
+            logger.info(f"Download complete... destination={destination}")
         else:
             logger.error(
                 f"Failed to retrieve the file. HTTP Status: {response.status_code}"
@@ -102,7 +113,7 @@ def download_default_cards(
     for db in all_dbs["data"]:
         if db["type"] == bulk_data_type:
             uri = db["download_uri"]
-            logger.info("Downloading database", database=bulk_data_type, uri=uri)
+            logger.info(f"Downloading database... database={bulk_data_type}, uri={uri}")
             download_file(uri, local_path)
             return local_path
 
