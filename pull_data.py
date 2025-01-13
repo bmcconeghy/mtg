@@ -8,12 +8,12 @@ from enum import StrEnum
 import pandas as pd
 import typer
 
-logging.basicConfig(encoding='utf-8', level=logging.INFO)
+logging.basicConfig(encoding="utf-8", level=logging.INFO)
 console_handler = logging.StreamHandler()
 formatter = logging.Formatter(
     "{asctime} - {message}",
-     style="{",
-     datefmt="%Y-%m-%d %H:%M",
+    style="{",
+    datefmt="%Y-%m-%d %H:%M",
 )
 console_handler.setFormatter(formatter)
 logger = logging.getLogger(__name__)
@@ -72,20 +72,6 @@ def flatten_dict(d: dict, parent_key: str = "", sep: str = "_") -> dict:
     return dict(items)
 
 
-def find_cards(
-    card_name: str,
-    set_name: str | None = None,
-    finish: Finish | None = None,
-    db: list[dict] | None = None,
-) -> list:
-    # TODO: Add in logic to allow db being passed in
-    # TODO: Add logic to parse out the set_name and finish
-    card_name = card_name.lower()
-    all_cards_with_name = [card for card in db if card_name in card["name"].lower()]
-
-    return all_cards_with_name
-
-
 def get_database_uris():
     db_uri_response = requests.get(
         f"{SCRYFALL_URL}/bulk-data",
@@ -136,11 +122,72 @@ def convert_json_db_to_csv(
         default=None, help="Path to the Scryfall DB on your local machine"
     ),
 ):
-    assert not os.path.exists(output_path), f"{output_path=} already exists! Either delete it, or specify a different file path."
+    assert not os.path.exists(
+        output_path
+    ), f"{output_path=} already exists! Either delete it, or specify a different file path."
     if not json_db_path:
-        db_path = download_default_cards()
-    df = generate_dataframe_from_db(db_path)
+        json_db_path = download_default_cards()
+    df = generate_dataframe_from_db(json_db_path)
     df.to_csv(output_path, index=False)
+
+
+def get_price_for_finish(s: pd.Series):
+    """Map finish type price so we can merge into a single column."""
+    if s["finish"] not in Finish:
+        logger.error(f"{s['finish']} is not a known finish")
+        return None
+    if s["finish"] == Finish.nonfoil:
+        return s["prices_usd"]
+    if s["finish"] == Finish.foil:
+        return s["prices_usd_foil"]
+    elif s["finish"] == Finish.etched:
+        return s["prices_usd_etched"]
+
+
+@app.command()
+def update_collection_with_prices(
+    collection_path: str = typer.Option(
+        help="Path to Collection CSV. Required columns: card_name, set_name, collector_number, and finish."
+    ),
+    output_path: str = typer.Option(
+        help="Path to  where the updated Collection CSV will be written."
+    ),
+    json_db_path: str = typer.Option(
+        default=None, help="Path to the Scryfall DB on your local machine"
+    ),
+):
+    if not json_db_path:
+        db = generate_dataframe_from_db(download_default_cards())
+    else:
+        db = generate_dataframe_from_db(json_db_path)
+
+    # If there isn't a price, we don't want to see the card
+    db.dropna(subset=["prices_usd"], inplace=True)
+
+    collection = pd.read_csv(collection_path)
+
+    # Cast to lower case to ensure a more accurate match
+    # Misplaced commas or typos currently not supported
+    collection["card_name_lower_case"] = collection["card_name"].str.lower()
+    db["card_name_lower_case"] = db["name"].str.lower()
+
+    # TODO: Currently drops all other data found in collection,
+    # could change this to keep it and elegantly update?
+    merged = collection[
+        ["card_name_lower_case", "set_name", "collector_number", "finish"]
+    ].merge(db, how="left", on=["card_name_lower_case", "set_name", "collector_number"])
+
+    # Normalize our prices, based on finish
+    merged["price"] = merged.apply(get_price_for_finish, axis=1)
+
+    # Subset to columns of interest
+    collection_with_prices = merged[
+        ["name", "set_name", "collector_number", "finish", "type_line", "cmc", "price"]
+    ]
+
+    collection_with_prices.rename(columns={"name": "card_name"}).to_csv(
+        output_path, index=False
+    )
 
 
 if __name__ == "__main__":
