@@ -190,5 +190,21 @@ def update_collection_with_prices(
     )
 
 
+@app.command()
+def generate_set_name_list(
+    output_path: str = typer.Option(help="Path to where set name CSV will be written."),
+    json_db_path: str = typer.Option(
+        default=None, help="Path to the Scryfall DB on your local machine"
+    ),
+):
+    if not json_db_path:
+        json_db_path = download_default_cards()
+    with open(json_db_path) as f:
+        db = json.load(f)
+
+    df = pd.DataFrame({card["set_name"] for card in db}, columns=["set_name"])
+    df.to_csv(output_path, index=False)
+
+
 if __name__ == "__main__":
     app()
